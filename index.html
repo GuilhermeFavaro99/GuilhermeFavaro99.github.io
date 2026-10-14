@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guilherme — segurança ofensiva</title>
+<meta name="description" content="Write-ups de vulnerabilidades encontradas e reportadas de forma responsável.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#inicio">Guilherme</a>
+  <nav aria-label="Seções">
+    <a href="#divulgacoes">Divulgações</a>
+    <a href="#writeup">Write-up</a>
+    <a href="#contato">Contato</a>
+  </nav>
+  <button id="tema" type="button" aria-pressed="false">Tema escuro</button>
+</header>
+
+<main id="inicio">
+  <section class="hero">
+    <h1>Encontro falhas em sistemas reais e reporto antes que alguém as explore.</h1>
+    <p>Segurança ofensiva, com foco em aplicações web e lógica de negócio. Aqui ficam os write-ups das vulnerabilidades que reportei de forma responsável, sempre anonimizados.</p>
+  </section>
+
+  <section id="divulgacoes">
+    <h2>Divulgações responsáveis</h2>
+    <ul class="lista">
+      <li><strong>SSRF com mapeamento de rede interna</strong> (severidade baixa). Aceito em programa nacional de bug bounty.</li>
+      <li><strong>Manipulação de preço em plataforma de assinaturas.</strong> Reportada ao proprietário e corrigida.</li>
+      <li><strong>Política de escrita permissiva em banco Supabase.</strong> Reportada ao desenvolvedor e corrigida no dia seguinte. <a href="#writeup">Leia o write-up</a>.</li>
+    </ul>
+  </section>
+
+  <article id="writeup">
+    <h2>Plano pago de graça por uma política de UPDATE permissiva</h2>
+
+    <dl class="ficha">
+      <div><dt>Classe</dt><dd>CWE-863, autorização incorreta</dd></div>
+      <div><dt>Alvo</dt><dd>Plataforma brasileira de assinatura de software (anonimizada)</dd></div>
+      <div><dt>Encontrada</dt><dd>Setembro de 2025</dd></div>
+      <div><dt>Corrigida</dt><dd>No dia seguinte ao report</dd></div>
+      <div><dt>Canal</dt><dd>WhatsApp, com o desenvolvedor</dd></div>
+      <div><dt>Escopo testado</dt><dd>Apenas a minha própria conta</dd></div>
+    </dl>
+
+    <h3>Resumo</h3>
+    <p>Uma política de escrita permissiva no banco Supabase da plataforma permitia que um usuário alterasse o campo de assinatura da própria conta e obtivesse o plano pago sem pagar.</p>
+
+    <h3>Contexto</h3>
+    <p>Trata-se de uma plataforma brasileira de assinatura de software. O fluxo de cobrança funciona assim: o usuário gera um QR code, paga por cartão de crédito ou Pix, e o campo de assinatura da conta passa a ser verdadeiro. Alterei apenas a minha própria conta e não acessei nem modifiquei dados de terceiros.</p>
+
+    <h3>Como cheguei nisso</h3>
+    <p>Ao observar as requisições na aba de rede do DevTools, identifiquei que o cliente consultava diretamente um endpoint Supabase. Minha primeira hipótese era listar usuários, mas a requisição GET retornava apenas os dados da minha conta, o que mostrou que a leitura estava restringida.</p>
+    <p>Em seguida, testei a permissão de escrita com um scanner próprio, apenas contra a minha conta, e constatei que o método PATCH era aceito. Formulei então a hipótese de que o campo de assinatura também era gravável e a confirmei. Na correção, o desenvolvedor confirmou que a causa era uma política de UPDATE permissiva, sem restrição das colunas editáveis.</p>
+
+    <h3>Prova de conceito</h3>
+    <p>Uma requisição PATCH à API REST, autenticada apenas com a chave pública já presente no cliente, alterando uma coluna da própria conta.</p>
+
+    <h3>Impacto</h3>
+    <p>Acesso gratuito a um plano de R$ 360 por ano por conta, sem limite de contas, com possível custo de operação adicional para a plataforma. Outras colunas da própria linha podiam estar igualmente graváveis, o que não foi testado. A leitura de dados de terceiros não era possível.</p>
+
+    <h3>Linha do tempo</h3>
+    <p>Encontrada em setembro de 2025, reportada pelo WhatsApp e corrigida no dia seguinte, com ajuste da política de UPDATE.</p>
+
+    <h3>Lições</h3>
+    <p>A chave anon do Supabase é pública por desenho; a proteção está nas políticas de acesso. Ter RLS ativo não basta: uma política de UPDATE do tipo “o usuário edita a própria linha” libera todas as colunas dessa linha. O RLS atua por linha, então restringir colunas exige permissões por coluna, gatilho no banco ou mover a escrita para o backend.</p>
+    <p>O estado de pagamento só deve ser escrito pelo backend, após confirmação do provedor de pagamento, nunca por uma coluna editável pelo cliente.</p>
+  </article>
+</main>
+
+<footer id="contato">
+  <p>Contato e perfis:</p>
+  <p>
+    <a href="https://github.com/GuilhermeFavaro99">GitHub</a>
+    <a href="https://www.linkedin.com/in/guilherme-henrique-favaro-094714245">LinkedIn</a>
+    <a href="mailto:guifavaro2004@gmail.com">E-mail</a>
+  </p>
+</footer>
+<script src="script.js"></script>
+</body>
+</html>
