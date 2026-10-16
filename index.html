@@ -12,7 +12,7 @@
   <a class="brand" href="#inicio">Guilherme</a>
   <nav aria-label="Seções">
     <a href="#divulgacoes">Divulgações</a>
-    <a href="#writeup">Write-up</a>
+    <a href="#writeups">Write-ups</a>
     <a href="#contato">Contato</a>
   </nav>
   <button id="tema" type="button" aria-pressed="false">Tema escuro</button>
@@ -27,13 +27,14 @@
   <section id="divulgacoes">
     <h2>Divulgações responsáveis</h2>
     <ul class="lista">
-      <li><strong>SSRF com mapeamento de rede interna</strong> (severidade baixa). Aceito em programa nacional de bug bounty.</li>
-      <li><strong>Manipulação de preço em plataforma de assinaturas.</strong> Reportada ao proprietário e corrigida.</li>
-      <li><strong>Política de escrita permissiva em banco Supabase.</strong> Reportada ao desenvolvedor e corrigida no dia seguinte. <a href="#writeup">Leia o write-up</a>.</li>
+      <li><strong>SSRF com mapeamento de rede interna</strong> (severidade baixa). Aceito em programa nacional de bug bounty. <a href="#writeup-ssrf">Leia o write-up</a>.</li>
+      <li><strong>Manipulação de preço em plataforma de assinaturas.</strong> Reportada ao proprietário e corrigida. <a href="#writeup-preco">Leia o write-up</a>.</li>
+      <li><strong>Política de escrita permissiva em banco Supabase.</strong> Reportada ao desenvolvedor e corrigida no dia seguinte. <a href="#writeup-supabase">Leia o write-up</a>.</li>
     </ul>
   </section>
 
-  <article id="writeup">
+  <div id="writeups">
+  <article id="writeup-supabase">
     <h2>Plano pago de graça por uma política de UPDATE permissiva</h2>
 
     <dl class="ficha">
@@ -68,6 +69,88 @@
     <p>A chave anon do Supabase é pública por desenho; a proteção está nas políticas de acesso. Ter RLS ativo não basta: uma política de UPDATE do tipo “o usuário edita a própria linha” libera todas as colunas dessa linha. O RLS atua por linha, então restringir colunas exige permissões por coluna, gatilho no banco ou mover a escrita para o backend.</p>
     <p>O estado de pagamento só deve ser escrito pelo backend, após confirmação do provedor de pagamento, nunca por uma coluna editável pelo cliente.</p>
   </article>
+
+  <article id="writeup-preco">
+    <h2>Assinatura por R$ 0,01: preço definido pelo cliente</h2>
+
+    <dl class="ficha">
+      <div><dt>Classe</dt><dd>CWE-472, parâmetro tratado como imutável (relacionada à CWE-602, validação só no cliente)</dd></div>
+      <div><dt>Alvo</dt><dd>Plataforma brasileira de assinaturas (anonimizada)</dd></div>
+      <div><dt>Encontrada</dt><dd>09/2025</dd></div>
+      <div><dt>Corrigida</dt><dd>09/2025</dd></div>
+      <div><dt>Canal</dt><dd>WhatsApp</dd></div>
+      <div><dt>Escopo testado</dt><dd>Geração do QR code com valor adulterado. Pagamento não concluído.</dd></div>
+    </dl>
+
+    <h3>Resumo</h3>
+    <p>O valor da assinatura era enviado pelo navegador na requisição de checkout, e o servidor o aceitava sem conferir com o catálogo. Ao alterar o valor para R$ 0,01, a plataforma gerou um QR code de pagamento nesse valor.</p>
+
+    <h3>Contexto</h3>
+    <p>A plataforma vende assinaturas pela web. Para contratar, o usuário escolhe um plano e recebe um QR code para pagar por Pix. O fluxo parte do princípio de que o valor da cobrança é definido pelo servidor.</p>
+
+    <h3>Como cheguei nisso</h3>
+    <p>Ao interceptar a requisição de checkout com um proxy HTTP (Burp Suite), percebi que o preço do plano trafegava como parâmetro enviado pelo navegador. Formulei a hipótese de que o servidor confiava nesse valor, alterei-o para R$ 0,01 e reenviei a requisição. A plataforma respondeu com um QR code gerado para esse valor. Ao escaneá-lo, o aplicativo de pagamento exibiu a cobrança de R$ 0,01.</p>
+
+    <h3>Escopo</h3>
+    <p>Parei nesse ponto. Não concluí o pagamento, e nenhuma assinatura foi ativada. A exibição do valor no aplicativo já bastava para demonstrar que o servidor aceitou o preço adulterado. Reportei em seguida, e os responsáveis confirmaram que o pagamento seria concluído normalmente.</p>
+
+    <h3>Impacto</h3>
+    <p>Qualquer usuário poderia contratar um plano por R$ 0,01 em vez do valor integral, repetindo o procedimento quantas vezes quisesse. O resultado é perda direta de receita, sem exigir acesso privilegiado nem ferramenta além de um proxy.</p>
+
+    <h3>Correção e mitigação</h3>
+    <p>A plataforma corrigiu o problema após o report. As medidas corretas para esse caso são:</p>
+    <ul class="lista">
+      <li>O cliente envia apenas o identificador do plano, e o servidor busca o preço no próprio catálogo.</li>
+      <li>Na confirmação do pagamento, o servidor confere se o valor recebido corresponde ao esperado para aquele pedido.</li>
+      <li>O pedido registra o valor calculado pelo servidor, e não o recebido do cliente.</li>
+    </ul>
+
+    <h3>Linha do tempo</h3>
+    <p>Encontrada em 09/2025. Reportada por WhatsApp. Corrigida em 09/2025.</p>
+
+    <h3>Lições</h3>
+    <p>Preço e estado de pagamento são decisões do servidor. Qualquer dado que o cliente envia pode ser alterado, então ele só serve como pedido (qual plano), nunca como autoridade (quanto custa). Testar o fluxo de checkout com uma requisição adulterada deveria fazer parte da revisão de qualquer sistema de cobrança.</p>
+  </article>
+
+  <article id="writeup-ssrf">
+    <h2>SSRF com mapeamento de rede interna em programa de bug bounty</h2>
+
+    <dl class="ficha">
+      <div><dt>Classe</dt><dd>CWE-918, falsificação de requisição no lado do servidor (SSRF)</dd></div>
+      <div><dt>Alvo</dt><dd>Aplicação em programa nacional de bug bounty (anonimizada)</dd></div>
+      <div><dt>Severidade</dt><dd>Baixa, conforme a classificação do programa</dd></div>
+      <div><dt>Resultado</dt><dd>Aceito pelo programa</dd></div>
+      <div><dt>Encontrada</dt><dd>05/2025</dd></div>
+      <div><dt>Escopo testado</dt><dd>Site Wordpress</dd></div>
+    </dl>
+
+    <h3>Resumo</h3>
+    <p>Um ponto da aplicação fazia requisições a destinos informados pelo usuário. Isso permitia usar o servidor para alcançar a rede interna e identificar quais endereços respondiam, o que caracteriza mapeamento da rede interna.</p>
+
+    <h3>Como cheguei nisso</h3>
+    <p>Executei, dentro do escopo do programa, um scanner que desenvolvi. Ele sinalizou um comportamento compatível com SSRF. Não tratei o alerta como conclusão: validei manualmente e só então enviei o relatório.</p>
+
+    <h3>Escopo</h3>
+    <p>Website Wordpress</p>
+
+    <h3>Impacto</h3>
+    <p>O impacto confirmado foi o mapeamento da rede interna, por isso a severidade baixa. Em outros contextos, uma SSRF pode levar a serviços internos e a credenciais de ambiente de nuvem. Esse desdobramento não foi explorado neste caso.</p>
+
+    <h3>Mitigação</h3>
+    <ul class="lista">
+      <li>Restringir os destinos permitidos a uma lista explícita.</li>
+      <li>Bloquear endereços privados, de loopback e de link-local, verificando o IP depois da resolução de DNS.</li>
+      <li>Desabilitar o seguimento de redirecionamentos nessas requisições.</li>
+      <li>Segmentar a rede para que o servidor da aplicação não alcance o que não precisa.</li>
+    </ul>
+
+    <h3>Linha do tempo</h3>
+    <p>Encontrada em 05/2025, reportada pelo canal do programa e aceita na sequência.</p>
+
+    <h3>Lições</h3>
+    <p>Um scanner levanta candidatos; a validação manual decide o que é real. Mesmo uma SSRF de severidade baixa mostra como um ponto de entrada web pode dar visibilidade sobre o que há atrás do perímetro.</p>
+  </article>
+  </div>
 </main>
 
 <footer id="contato">
