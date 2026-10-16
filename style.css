@@ -32,6 +32,7 @@ p{margin:.6rem 0}
 
 .lista{padding-left:1.1rem;margin:0}
 .lista li{margin:.7rem 0}
+article+article{margin-top:4rem;padding-top:.5rem;border-top:1px solid var(--rule)}
 
 .ficha{margin:1.5rem 0 2rem;padding:1rem 1.25rem;background:var(--panel);border-left:3px solid var(--accent);font-family:var(--sans);font-size:.95rem}
 .ficha div{display:grid;grid-template-columns:8.5rem 1fr;gap:.75rem;padding:.35rem 0}
